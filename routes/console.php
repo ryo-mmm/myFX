@@ -9,4 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // 1時間おきに実行（API制限を考慮）
-Schedule::command('app:fetch-vix')->hourly();
+Schedule::command('app:fetch-vix')->hourly(17);

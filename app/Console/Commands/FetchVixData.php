@@ -3,59 +3,55 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use App\Services\ExternalApi\VixService;
 use App\Models\MarketData;
 use Illuminate\Support\Facades\Log;
 
 class FetchVixData extends Command
 {
-    // ターミナルで実行する時のコマンド名
+    // コマンド名を定義（ここが空だとさっきのエラーになります）
     protected $signature = 'app:fetch-vix';
+    protected $description = 'Yahoo FinanceからVIX指数を取得してDBに保存します';
 
-    // コマンドの説明
-    protected $description = 'Alpha VantageからVIX指数を取得して保存します';
-
-    /**
-     * コマンドの実行ロジック
-     */
-    public function handle(VixService $vixService)
+    public function handle()
     {
-        $this->info('VIXデータの取得を開始します...');
+        $this->info('Google FinanceからVIXデータを取得中...');
 
-        $data = $vixService->fetchVixIndex();
-
-        if (!$data) {
-            $this->error('データの取得に失敗しました。');
-            return 1;
-        }
-
-        // APIのレスポンス形式に合わせてデータを抽出
-        // ※Alpha VantageのVIXエンドポイントの構造に合わせる必要があります
         try {
-            // 仮の構造: 最新の終値を抽出する例
-            // 実際はAPIレスポンスのJSON構造をログで確認しながら調整します
-            $vixValue = $data['Global Quote']['05. price'] ?? null;
+            // Google FinanceのVIXページ（INDEXCBOE: VIX）
+            $url = "https://www.google.com/finance/quote/VIX:INDEXCBOE";
 
-            if ($vixValue) {
-                MarketData::create([
+            // ブラウザからのアクセスを装うためのUser-Agentを設定
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            ])->get($url);
+
+            if (!$response->successful()) {
+                throw new \Exception("Google Financeにアクセスできませんでした。");
+            }
+
+            $html = $response->body();
+
+            // 正規表現で「data-last-price」という属性に隠されている価格を抽出
+            // Google FinanceのHTML構造に基づいた抽出方法です
+            if (preg_match('/data-last-price="([\d\.]+)"/', $html, $matches)) {
+                $currentPrice = (float)$matches[1];
+
+                \App\Models\MarketData::create([
                     'symbol' => 'VIX',
-                    'open' => 0, // VIXは指数なのでcloseのみでも可
-                    'high' => 0,
-                    'low' => 0,
-                    'close' => $vixValue,
-                    'vix_index' => $vixValue,
+                    'open'   => 0, // スクレイピングでは現在値のみ取得
+                    'high'   => 0,
+                    'low'    => 0,
+                    'close'  => $currentPrice,
+                    'volume' => 0,
                     'measured_at' => now(),
                 ]);
 
-                $this->info("VIX指数 {$vixValue} を保存しました。");
+                $this->info("取得成功: VIX = {$currentPrice}");
             } else {
-                $this->warn('有効なVIX値が見つかりませんでした。API制限の可能性があります。');
-                Log::warning('VIX API Response:', $data);
+                throw new \Exception("HTMLから価格データを見つけられませんでした。");
             }
         } catch (\Exception $e) {
-            $this->error('保存中にエラーが発生しました: ' . $e->getMessage());
+            $this->error("エラーが発生しました: " . $e->getMessage());
         }
-
-        return 0;
     }
 }
