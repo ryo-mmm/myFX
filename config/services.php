@@ -39,4 +39,9 @@ return [
         'key' => env('ALPHA_VANTAGE_KEY'),
     ],
 
+    // config/services.php
+    'alpha_vantage' => [
+        'key' => env('ALPHA_VANTAGE_KEY'),
+    ],
+
 ];
