@@ -31,13 +31,16 @@
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="grid grid-cols-2 gap-4 mb-8">
                 @foreach(['VIX' => 'VIX指数', 'US10Y' => '米10年債', 'DXY' => 'ドル指数', 'SP500' => 'S&P500'] as $key => $label)
-                @php $data = $latestData[$key] ?? null; @endphp
+                @php
+                $data = $latestData[$key] ?? null;
+                @endphp
                 <div class="bg-white p-4 rounded-xl shadow-sm border {{ ($key === 'VIX' && $data && $data->close >= 20) ? 'border-red-500 bg-red-50' : 'border-gray-200' }}">
                     <h3 class="text-xs font-semibold text-gray-400 uppercase">{{ $label }}</h3>
                     <div class="mt-1 flex items-baseline">
                         <span class="text-2xl font-bold text-gray-900">
+                            {{-- ここで三項演算子の書き方にミスがあるとエラーになります --}}
                             {{ $data ? number_format($data->close, ($key === 'US10Y' || $key === 'DXY' ? 3 : 2)) : '---' }}
                         </span>
                     </div>
