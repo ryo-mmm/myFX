@@ -22,14 +22,16 @@
                             <span class="text-xl ml-1 font-bold opacity-70">円</span>
                         </div>
                         <div class="text-right">
-                            <p class="text-xs opacity-80">最終更新</p>
-                            <p class="text-lg font-mono font-bold">{{ $usdjpy ? $usdjpy->measured_at->format('H:i:s') : '--:--:--' }}</p>
+                            <p class="text-xs opacity-80">最終更新 (日本時間)</p>
+                            <p class="text-lg font-mono font-bold">
+                                {{ $usdjpy ? \Carbon\Carbon::parse($usdjpy->measured_at)->addHours(9)->format('H:i:s') : '--:--:--' }}
+                            </p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {{-- 2. 4つの指標カード (2x2) --}}
+            {{-- 2. 4つの指標カード --}}
             <div class="grid grid-cols-2 gap-4 mb-8">
                 @foreach(['VIX' => 'VIX指数', 'US10Y' => '米10年債', 'DXY' => 'ドル指数', 'SP500' => 'S&P500'] as $key => $label)
                 @php $data = $latestData[$key] ?? null; @endphp
@@ -41,13 +43,13 @@
                         </span>
                     </div>
                     <p class="text-[10px] text-gray-400 mt-1 italic">
-                        {{ $data ? $data->measured_at->format('H:i') : '--:--' }}
+                        {{ $data ? \Carbon\Carbon::parse($data->measured_at)->addHours(9)->format('H:i') : '--:--' }}
                     </p>
                 </div>
                 @endforeach
             </div>
 
-            {{-- 3. リスク定義 --}}
+            {{-- 3. リスクレベル定義 (復活) --}}
             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
                 <h3 class="text-sm font-semibold text-gray-400 uppercase mb-3">リスクレベル定義</h3>
                 <div class="grid grid-cols-3 gap-2">
@@ -67,28 +69,25 @@
             </div>
 
             {{-- 4. グラフセクション --}}
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">VIX 24時間トレンド</h3>
-                <div style="height:300px;"><canvas id="vixChart"></canvas></div>
+            <div class="space-y-8">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">VIX 24時間トレンド</h3>
+                    <div style="height:300px;"><canvas id="vixChart"></canvas></div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">ドル円 24時間トレンド</h3>
+                    <div style="height:300px;"><canvas id="usdjpyChart"></canvas></div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">ドル円 vs 米10年債利回り</h3>
+                    <div style="height:400px;"><canvas id="comparisonChart"></canvas></div>
+                </div>
             </div>
 
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">ドル円 24時間トレンド</h3>
-                <div style="height:300px;"><canvas id="usdjpyChart"></canvas></div>
-            </div>
-
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">ドル円 vs 米10年債利回り</h3>
-                <div style="height:400px;"><canvas id="comparisonChart"></canvas></div>
-            </div>
-
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">米10年債利回り 24時間トレンド</h3>
-                <div style="height:300px;"><canvas id="us10yChart"></canvas></div>
-            </div>
-
-            {{-- 5. 履歴テーブル --}}
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            {{-- 5. 履歴テーブル (判定バッジ復活) --}}
+            <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div class="p-6 border-b border-gray-100">
                     <h3 class="text-lg font-bold text-gray-800">最新履歴 (VIX)</h3>
                 </div>
@@ -96,7 +95,7 @@
                     <table class="w-full text-left border-collapse">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">取得日時</th>
+                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">取得日時 (JST)</th>
                                 <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">VIX指数</th>
                                 <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">判定</th>
                             </tr>
@@ -104,7 +103,9 @@
                         <tbody class="divide-y divide-gray-100">
                             @foreach($historyVix as $vix)
                             <tr class="hover:bg-gray-50">
-                                <td class="px-6 py-4 text-sm text-gray-600">{{ $vix->measured_at->format('m/d H:i') }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-600">
+                                    {{ \Carbon\Carbon::parse($vix->measured_at)->addHours(9)->format('m/d H:i') }}
+                                </td>
                                 <td class="px-6 py-4 text-sm font-mono font-bold text-gray-900">{{ number_format($vix->close, 2) }}</td>
                                 <td class="px-6 py-4">
                                     <span class="px-2 py-1 text-xs rounded-full font-bold {{ $vix->close >= 20 ? 'bg-red-100 text-red-700' : ($vix->close >= 15 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700') }}">
@@ -120,18 +121,25 @@
         </div>
     </div>
 
-    {{-- スクリプト --}}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         window.onload = function() {
-            // データの受け取り
             const labels = @json($chartLabels);
             const usdValues = @json($usdjpyValues);
             const us10yValues = @json($us10yValues);
             const vixLabels = @json($vixLabels);
             const vixValues = @json($vixValues);
 
-            // --- 1. VIXチャート ---
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
+            };
+
+            // VIX
             new Chart(document.getElementById('vixChart'), {
                 type: 'line',
                 data: {
@@ -140,16 +148,14 @@
                         label: 'VIX',
                         data: vixValues,
                         borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         fill: true
                     }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
+                options: commonOptions
             });
 
-            // --- 2. ドル円チャート ---
+            // USDJPY
             new Chart(document.getElementById('usdjpyChart'), {
                 type: 'line',
                 data: {
@@ -158,45 +164,13 @@
                         label: 'USD/JPY',
                         data: usdValues,
                         borderColor: '#2563eb',
-                        fill: true
+                        fill: false
                     }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
+                options: commonOptions
             });
 
-            // --- 3. 米10年債チャート（ここが追加分！） ---
-            const ctx10y = document.getElementById('us10yChart');
-            if (ctx10y) {
-                new Chart(ctx10y, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'US10Y (%)',
-                            data: us10yValues,
-                            borderColor: '#f59e0b', // オレンジ
-                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                            fill: true
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                ticks: {
-                                    callback: (v) => v.toFixed(3) + '%'
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-
-            // --- 4. 比較チャート ---
+            // Comparison
             new Chart(document.getElementById('comparisonChart'), {
                 type: 'line',
                 data: {
@@ -216,8 +190,7 @@
                     ]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    ...commonOptions,
                     scales: {
                         'y-usd': {
                             position: 'left'

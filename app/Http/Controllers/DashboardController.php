@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\MarketData;
-use App\Models\AnalysisResult;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -12,41 +12,35 @@ class DashboardController extends Controller
     {
         $userName = $request->user()->name;
 
-        // ドル円 (メイン指標)
-        $usdjpy = MarketData::where('symbol', 'USDJPY')
-            ->orderBy('measured_at', 'desc')
-            ->first();
+        // 1. 最新データの取得
+        $usdjpy = MarketData::where('symbol', 'USDJPY')->orderBy('measured_at', 'desc')->first();
 
         $symbols = ['VIX', 'US10Y', 'DXY', 'SP500'];
         $latestData = [];
         foreach ($symbols as $symbol) {
-            $latestData[$symbol] = MarketData::where('symbol', $symbol)
-                ->orderBy('measured_at', 'desc')
-                ->first();
+            $latestData[$symbol] = MarketData::where('symbol', $symbol)->orderBy('measured_at', 'desc')->first();
         }
 
-        // 1. ドル円 24時間データ
-        $usdjpyChartData = MarketData::where('symbol', 'USDJPY')
-            ->where('measured_at', '>=', now()->subDay())
-            ->orderBy('measured_at', 'asc')
-            ->get();
+        // 2. チャート用データの取得（直近24時間）
+        $usdjpyChartData = MarketData::where('symbol', 'USDJPY')->where('measured_at', '>=', now()->subDay())->orderBy('measured_at', 'asc')->get();
+        $us10yChartData = MarketData::where('symbol', 'US10Y')->where('measured_at', '>=', now()->subDay())->orderBy('measured_at', 'asc')->get();
+        $vixData = MarketData::where('symbol', 'VIX')->where('measured_at', '>=', now()->subDay())->orderBy('measured_at', 'asc')->get();
 
-        // 2. 米10年債 24時間データ (比較グラフ用)
-        $us10yChartData = MarketData::where('symbol', 'US10Y')
-            ->where('measured_at', '>=', now()->subDay())
-            ->orderBy('measured_at', 'asc')
-            ->get();
+        // 3. ラベルの加工（DBの時刻に強制的に9時間プラスする）
+        $chartLabels = $usdjpyChartData->map(function ($data) {
+            return Carbon::parse($data->measured_at)->addHours(9)->format('H:i');
+        });
 
-        // グラフで使いやすいように加工
-        $chartLabels = $usdjpyChartData->pluck('measured_at')->map(fn($d) => $d->format('H:i'));
         $usdjpyValues = $usdjpyChartData->pluck('close');
         $us10yValues = $us10yChartData->pluck('close');
 
-        // --- 既存のVIXデータ取得はそのまま ---
-        $historyVix = MarketData::where('symbol', 'VIX')->orderBy('measured_at', 'desc')->limit(20)->get();
-        $vixData = MarketData::where('symbol', 'VIX')->where('measured_at', '>=', now()->subDay())->orderBy('measured_at', 'asc')->get();
-        $vixLabels = $vixData->pluck('measured_at')->map(fn($d) => $d->format('H:i'));
+        $vixLabels = $vixData->map(function ($data) {
+            return Carbon::parse($data->measured_at)->addHours(9)->format('H:i');
+        });
         $vixValues = $vixData->pluck('close');
+
+        // 4. 履歴テーブル用（VIXの最新20件）
+        $historyVix = MarketData::where('symbol', 'VIX')->orderBy('measured_at', 'desc')->limit(20)->get();
 
         return view('dashboard', compact(
             'userName',
